@@ -1,0 +1,22 @@
+# Sidebar navigation
+
+- label: 'Meta'
+  link: '/'
+- label: Posts
+  items:
+    - label: 'Tech'
+      link: 'posts/tags/tech'
+    - label: 'Travel'
+      link: 'posts/tags/travel'
+    - label: 'Food'
+      link: 'posts/tags/food'
+    - label: 'Etc'
+      link: 'posts/tags/etc'
+- label: Talks
+  items:
+    - label: 'Tech'
+      link: 'talks/tags/tech'
+- label: Misc
+  items:
+    - label: 'Gratitude'
+      link: 'misc/tags/gratitude'

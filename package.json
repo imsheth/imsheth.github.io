@@ -1,0 +1,41 @@
+{
+  "name": "imsheth",
+  "private": false,
+  "version": "4.0.0",
+  "description": "The source code for https://www.imsheth.com, built on https://github.com/Rocketseat/gatsby-starter-rocket-docs",
+  "author": "Ishan Sheth (@imsheth)",
+  "license": "MIT",
+  "starter-name": "gatsby-starter-rocket-docs",
+  "dependencies": {
+    "@rocketseat/gatsby-theme-docs": "^2.3.1",
+    "gatsby": "^3.0.4",
+    "gatsby-plugin-canonical-urls": "^3.0.0",
+    "gatsby-plugin-google-analytics": "^3.0.0",
+    "gatsby-plugin-manifest": "^3.0.0",
+    "gatsby-plugin-offline": "^4.0.0",
+    "gatsby-plugin-remove-trailing-slashes": "^3.0.0",
+    "gatsby-plugin-sitemap": "^3.0.0",
+    "prop-types": "^15.7.2",
+    "react": "^17.0.1",
+    "react-dom": "^17.0.1",
+    "react-simple-share": "^0.1.2"
+  },
+  "devDependencies": {},
+  "keywords": [
+    "imsheth",
+    "website",
+    "gatsby",
+    "gatsby-starter",
+    "gatsby-starter-rocket-docs"
+  ],
+  "scripts": {
+    "build": "gatsby build && sh post_build.sh",
+    "start": "gatsby develop",
+    "serve": "gatsby serve",
+    "clean": "gatsby clean"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/imsheth/imsheth.github.io.git"
+  }
+}
