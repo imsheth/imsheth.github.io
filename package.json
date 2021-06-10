@@ -2,7 +2,7 @@
   "name": "imsheth",
   "private": false,
   "version": "4.0.0",
-  "description": "The source code for https://www.imsheth.com, built on https://github.com/Rocketseat/gatsby-starter-rocket-docs",
+  "description": "The source code for https://imsheth.com, built on https://github.com/Rocketseat/gatsby-starter-rocket-docs",
   "author": "Ishan Sheth (@imsheth)",
   "license": "MIT",
   "starter-name": "gatsby-starter-rocket-docs",
