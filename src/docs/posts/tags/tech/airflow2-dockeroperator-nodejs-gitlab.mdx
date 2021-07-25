@@ -1,0 +1,856 @@
+---
+title: 'The Hows - Apache Airflow 2 using DockerOperator with node.js and Gitlab container registry on Ubuntu 20'
+description: 'This post is focused on how to setup Apache Airflow 2 using DockerOperator with node.js and Gitlab container registry on Ubuntu 20'
+image: /posts/airflow2-dockeroperator-nodejs-gitlab/airflow2-dockeroperator-nodejs-gitlab-banner.png
+disableTableOfContents: false
+---
+
+`Jul 25, 2021`
+
+<blockquote>
+    <p style="text-align:center">
+        The motivation for writing this post is in the hope that it helps others save lots of time, energy and nerve wracking phases that can lead to self doubt which I had extensively faced and would want others to avoid them altogether.
+    </p>
+</blockquote>
+
+This post is focused on how to setup Apache Airflow 2 using DockerOperator with node.js and Gitlab container registry on Ubuntu 20
+
+<a href="https://github.com/imsheth/airflow2-dockeroperator-nodejs-gitlab" target="_blank" rel="noopener noreferrer">
+  The relevant source code for the post can be found here
+</a><br /><br />
+
+
+
+---
+## Ubuntu 20.x.x
+1. Check the machine operating system, it should be Ubuntu 20.x.x to have the best shot at successful installation on the first attempt
+2. Our test machine operating system details (Ubuntu 20.04.2 LTS (Focal Fossa))
+```shell
+cat /etc/os-release
+```
+
+
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/1.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/1.png" alt="airflow2-dockeroperator-nodejs-gitlab-1-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+3. It is recommended to use the LTS version but not necessary
+
+4. This completes Ubuntu check
+
+
+
+
+
+---
+## python 3.6
+- <a href="https://github.com/apache/airflow#requirements" target="_blank" rel="noopener noreferrer">
+    Airflow works with specific versions of python, install python 3.6 as other versions aren't supported by airflow for DockerOperator though the documentation states otherwise
+  </a>
+- <a href="https://www.makeuseof.com/install-python-ubuntu/" target="_blank" rel="noopener noreferrer">
+    python ppa installation
+  </a>
+
+1. Install python 3.6 and required packages
+```shell
+sudo add-apt-repository ppa:deadsnakes/ppa && sudo apt-get update && sudo apt-get -y upgrade && sudo apt-get install software-properties-common && sudo apt install build-essential zlib1g-dev libncurses5-dev libgdbm-dev libnss3-dev libssl-dev libreadline-dev libffi-dev wget && sudo apt install python3.6 && python3.6 --version
+```
+
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/2.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/2.png" alt="airflow2-dockeroperator-nodejs-gitlab-2-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/3.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/3.png" alt="airflow2-dockeroperator-nodejs-gitlab-3-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+2. Verify python 3.6 installation path
+```shell
+whereis python
+```
+
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/4.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/4.png" alt="airflow2-dockeroperator-nodejs-gitlab-4-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+3. Set environment/path/alias variables for python 3.6 & pip 20.2.4
+- <a href="https://stackoverflow.com/a/60083786/3152654" target="_blank" rel="noopener noreferrer">
+    Setting path variable for python 3.6
+  </a>
+- <a href="https://stackoverflow.com/a/41986556/3152654" target="_blank" rel="noopener noreferrer">
+    Set alias for python to point to python 3.6
+  </a>
+- <a href="https://askubuntu.com/a/956193" target="_blank" rel="noopener noreferrer">
+    Set alias for python to point to python 3.6 in .bashrc
+  </a>
+```shell
+echo 'export PATH=$PATH:"/usr/bin/python3.6"' >> ~/.bashrc && echo 'alias python="python3.6"' >> ~/.bashrc && echo 'export PATH=$PATH:"/home/ubuntu/.local/bin"' >> ~/.bashrc && echo 'alias pip="pip3"' >> ~/.bashrc && source ~/.bashrc && echo $PATH && python --version
+```
+
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/5.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/5.png" alt="airflow2-dockeroperator-nodejs-gitlab-5-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+4. pip 20.2.4
+- <a href="https://pip.pypa.io/en/stable/installing/" target="_blank" rel="noopener noreferrer">
+    pip installation
+  </a>
+- <a href="https://airflow.apache.org/docs/apache-airflow/stable/start/local.html" target="_blank" rel="noopener noreferrer">
+    Only pip installation is currently officially supported by Apache Airflow 2
+  </a>
+
+```shell
+cd /tmp && curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && python get-pip.py pip==20.2.4 && pip --version
+```
+
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/6.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/6.png" alt="airflow2-dockeroperator-nodejs-gitlab-6-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+5. <a href="https://airflow.apache.org/docs/apache-airflow/2.0.0/installation.html" target="_blank" rel="noopener noreferrer">
+    On November 2020, new version of PIP (20.3) has been released with a new, 2020 resolver. This resolver might work with Apache Airflow as of 20.3.3, but it might lead to errors in installation. It might depend on your choice of extras. In order to install Airflow you might need to either downgrade pip to version 20.2.4 pip install --upgrade pip==20.2.4 or, in case you use Pip 20.3, you need to add option --use-deprecated legacy-resolver to your pip install command.
+  </a>
+
+6. This completes python and pip installation
+
+
+
+
+---
+## Airflow 2.0.1
+- <a href="https://airflow.apache.org/docs/apache-airflow/stable/start/local.html" target="_blank" rel="noopener noreferrer">
+    airflow needs a home, ~/airflow is the default, but you can lay foundation somewhere else if you prefer (optional)
+  </a>
+
+1. Create directories and set environment variables
+```shell
+mkdir airflow && mkdir dags_root && mkdir logs_root  && echo 'export AIRFLOW_HOME="/home/ubuntu/airflow"' >> ~/.bashrc && echo 'export AIRFLOW_VERSION="2.0.1"' >> ~/.bashrc && echo 'export PYTHON_VERSION="$(python --version | cut -d " " -f 2 | cut -d "." -f 1-2)"' >> ~/.bashrc && echo 'export CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt"' >> ~/.bashrc && source ~/.bashrc
+```
+
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/7.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/7.png" alt="airflow2-dockeroperator-nodejs-gitlab-7-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+2. Create virtual environment, the installation causes issues with gunicorn if not using one
+```shell
+cd airflow && pip install virtualenv && virtualenv -p python3.6 airflow_venv && source airflow_venv/bin/activate
+```
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/8.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/8.png" alt="airflow2-dockeroperator-nodejs-gitlab-8-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+3. Install Apache Airflow 2.0.1
+```shell
+pip install "apache-airflow==${AIRFLOW_VERSION}" --constraint "${CONSTRAINT_URL}"
+```
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/9.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/9.png" alt="airflow2-dockeroperator-nodejs-gitlab-9-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+4. This completes Apache Airflow 2 installation
+
+
+
+
+
+---
+## Postgres 12
+- <a href="https://www.digitalocean.com/community/tutorials/how-to-install-postgresql-on-ubuntu-20-04-quickstart" target="_blank" rel="noopener noreferrer">
+    Postgres installation 
+  </a>
+
+1. Install Postgres 12
+```shell
+sudo apt update && sudo apt install postgresql postgresql-contrib
+```
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/10.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/10.png" alt="airflow2-dockeroperator-nodejs-gitlab-10-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+2. Your data directory would be `/var/lib/postgresql/12/main` and log file would be `/var/log/postgresql/postgresql-12-main.log`
+
+3. Setup Postgres
+```shell
+sudo -i -u postgres
+createdb airflow
+
+createuser --interactive
+## Enter name of role to add: 
+airflow
+
+## Shall the new role be a superuser? (y/n)
+y
+exit
+
+## Add airflow user
+sudo adduser airflow
+sudo -u airflow psql
+```
+
+4. <a href="https://chartio.com/resources/tutorials/how-to-list-databases-and-tables-in-postgresql-using-psql/" target="_blank" rel="noopener noreferrer">
+    List databases and tables to verify
+  </a>
+
+```shell
+\l
+\c airflow
+\dt
+```
+
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/11.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/11.png" alt="airflow2-dockeroperator-nodejs-gitlab-11-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+5. <a href="https://airflow.apache.org/docs/apache-airflow/stable/howto/set-up-database.html" target="_blank" rel="noopener noreferrer">
+    Setup users
+  </a>
+
+```shell
+sudo -i -u postgres
+psql
+CREATE USER airflow_user WITH PASSWORD 'airflow_user';
+GRANT ALL PRIVILEGES ON DATABASE airflow TO airflow_user;
+exit
+
+exit
+```
+
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/12.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/12.png" alt="airflow2-dockeroperator-nodejs-gitlab-12-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+6. This completes Postgres installation and setup
+
+
+
+
+
+---
+## Airflow 2.0.1 config
+1. Change the config as per requirement
+- Defaults are available at https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html
+
+```shell
+vim /home/ubuntu/airflow/airflow.cfg
+```
+
+> Recommended for optimum usage
+
+> <a href="https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#dags-folder" target="_blank" rel="noopener noreferrer">
+  dags_folder = /home/ubuntu/dags_root
+  </a>
+
+> <a href="https://airflow.apache.org/docs/apache-airflow/stable/executor/local.html" target="_blank" rel="noopener noreferrer">
+  executor = LocalExecutor
+  </a>
+
+> <a href="https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#sql-alchemy-conn" target="_blank" rel="noopener noreferrer">
+  sql_alchemy_conn = postgresql+psycopg2://airflow_user:airflow_user@localhost:5432/airflow
+  </a>
+
+> <a href="https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#base-log-folder" target="_blank" rel="noopener noreferrer">
+  base_log_folder = /home/ubuntu/logs_root
+  </a>
+
+> <a href="https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#logging-level" target="_blank" rel="noopener noreferrer">
+  logging_level = DEBUG
+  </a>
+
+> <a href="https://airflow.apache.org/docs/apache-airflow/stable/security/api.html#disable-authentication" target="_blank" rel="noopener noreferrer">
+  auth_backend = airflow.api.auth.backend.default
+  </a>
+
+> <a href="https://github.com/apache/airflow/issues/13487#issuecomment-757661848" target="_blank" rel="noopener noreferrer">
+  enable_xcom_pickling = True
+  </a>
+
+> <a href="https://stackoverflow.com/a/65380493/3152654" target="_blank" rel="noopener noreferrer">
+  job_heartbeat_sec = 120
+  </a>
+
+> <a href="https://stackoverflow.com/a/47562663/3152654" target="_blank" rel="noopener noreferrer">
+  min_file_process_interval = 120
+  </a>
+
+> <a href="https://big-data-demystified.ninja/2020/03/23/airflow-performance-tuning-in-5-min/" target="_blank" rel="noopener noreferrer">
+  scheduler_zombie_task_threshold = 1800
+  </a>
+
+> Optional but useful
+
+> <a href="https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#expose-config" target="_blank" rel="noopener noreferrer">
+  expose_config = True
+  </a>
+
+> <a href="https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#base-url" target="_blank" rel="noopener noreferrer">
+  base_url = http://continental.thehightable.org:8080  
+  </a>
+
+> <a href="https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#hostname-callable" target="_blank" rel="noopener noreferrer">
+  hostname_callable = socket:gethostname
+  </a>
+
+> <a href="https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#worker-autoscale" target="_blank" rel="noopener noreferrer">
+  worker_autoscale = 16,12
+  </a>
+
+> <a href="https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#broker-url" target="_blank" rel="noopener noreferrer">
+  broker_url = amqp://guest:guest@localhost:5672//
+  </a>
+
+> <a href="https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#result-backend" target="_blank" rel="noopener noreferrer">
+  celery_result_backend = amqp://guest:guest@localhost:5672//
+  </a>
+
+2. Boot up webserver
+
+```shell
+airflow webserver
+```
+
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/13.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/13.png" alt="airflow2-dockeroperator-nodejs-gitlab-13-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+3. <a href="https://stackoverflow.com/a/65079921/3152654" target="_blank" rel="noopener noreferrer">
+  Fix ## ImportError: No module named psycopg2
+  </a>
+
+```shell
+sudo apt-get update && sudo apt-get install libpq-dev && pip3 install psycopg2-binary
+```
+
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/14.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/14.png" alt="airflow2-dockeroperator-nodejs-gitlab-14-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+4. Initialize the database (This has to be done only once you set your config else it'll take the settings from config before you edited the config)
+```shell
+airflow db init
+```
+
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/15.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/15.png" alt="airflow2-dockeroperator-nodejs-gitlab-15-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+5. Create airflow user
+```shell
+## username john
+## password wick
+airflow users create \
+    --username john \
+    --firstname John \
+    --lastname Wick \
+    --role Admin \
+    --email john@thehightable.org
+```
+
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/16.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/16.png" alt="airflow2-dockeroperator-nodejs-gitlab-16-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+6. Boot up the scheduler (from a new ssh session)
+```shell
+cd airflow && source airflow_venv/bin/activate && airflow scheduler
+```
+
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/17.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/17.png" alt="airflow2-dockeroperator-nodejs-gitlab-17-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+7. Boot up the webserver (from a same session as of until point 5)
+```shell
+airflow webserver
+```
+
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/18.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/18.png" alt="airflow2-dockeroperator-nodejs-gitlab-18-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+8. Login at the login prompt @IP:8080/localhost:8080 (Be sure that the port 8080 is open)
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/19.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/19.png" alt="airflow2-dockeroperator-nodejs-gitlab-19-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+9. Airflow dashboard
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/20.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/20.png" alt="airflow2-dockeroperator-nodejs-gitlab-20-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+10. This completes Apache Airflow 2 configuration
+
+
+
+
+
+---
+## Docker 20.10.7
+- <a href="https://docs.docker.com/engine/install/ubuntu/" target="_blank" rel="noopener noreferrer">
+  Docker installation
+  </a>
+
+1. Install docker 20.10.7
+```shell
+cd /tmp && curl -fsSL https://get.docker.com -o get-docker.sh && sh get-docker.sh
+```
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/21.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/21.png" alt="airflow2-dockeroperator-nodejs-gitlab-21-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+2. Get the GID for the docker group
+```shell
+cd ~ && getent group docker | cut -d: -f3
+```
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/22.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/22.png" alt="airflow2-dockeroperator-nodejs-gitlab-22-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+3. <a href="https://www.howtogeek.com/50787/add-a-user-to-a-group-or-second-group-on-linux/" target="_blank" rel="noopener noreferrer">
+  Add user to docker group
+  </a>
+```shell
+sudo usermod -aG docker ubuntu
+```
+
+4. <a href="https://www.howtogeek.com/howto/ubuntu/see-which-groups-your-linux-user-belongs-to/" target="_blank" rel="noopener noreferrer">
+  Verify user has been added to docker group
+  </a>
+```shell
+groups ubuntu
+```
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/23.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/23.png" alt="airflow2-dockeroperator-nodejs-gitlab-23-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+5. Install requirements (you can also add this entry to your dags repo root in by `&& pip freeze > requirements.txt` succeeding the below command)
+```shell
+pip install apache-airflow-providers-docker
+```
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/24.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/24.png" alt="airflow2-dockeroperator-nodejs-gitlab-24-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+6. <a href="https://blog.usejournal.com/how-to-enable-docker-remote-api-on-docker-host-7b73bd3278c6" target="_blank" rel="noopener noreferrer">
+  Enable docker remote API on docker host (comments section)
+  </a>
+```shell
+sudo vim /lib/systemd/system/docker.service
+```
+
+```shell
+# Comment the original line for backup to revert if needed
+#ExecStart=/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock
+ExecStart=/usr/bin/dockerd -H fd:// -H 0.0.0.0:2375 --containerd=/run/containerd/containerd.sock
+```
+
+7. Reload - restart daemon and verify docker remote API response
+```shell
+sudo systemctl daemon-reload
+sudo service docker restart
+curl http://localhost:2375/images/json
+```
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/25.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/25.png" alt="airflow2-dockeroperator-nodejs-gitlab-25-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+8. This completes docker 20.10.7 installation and setup
+
+
+
+
+
+---
+## Gitlab container registry
+- <a href="https://docs.gitlab.com/ee/user/packages/container_registry/" target="_blank" rel="noopener noreferrer">
+  About Gitlab container registry
+  </a>
+- This post uses connection to Gitlab container registry via docker remote API, without using connection from Airflow via the `docker_conn_id` parameter
+
+> Sample URLs where you can find container registry for your repo based on the repo being used for the post <br />
+> `https://gitlab.com/blogs-imsheth-com/airflow2-dockeroperator-nodejs-gitlab/container_registry` <br />
+> `https://gitlab.com/blogs-imsheth-com/airflow2-dockeroperator-nodejs-gitlab/-/settings/repository` <br />
+
+1. Create sample project in Gitlab on your local machine
+> Crete repo like <br />
+`https://gitlab.com/blogs-imsheth-com/airflow2-dockeroperator-nodejs-gitlab` <br />
+> Add your deploy key at <br />
+`https://gitlab.com/blogs-imsheth-com/airflow2-dockeroperator-nodejs-gitlab/-/settings/repository#js-deploy-keys-settings` <br />
+> Clone the repo <br />
+`https://gitlab.com/blogs-imsheth-com/airflow2-dockeroperator-nodejs-gitlab` <br />
+> Copy paste sample code from <br />
+`https://github.com/imsheth/airflow2-dockeroperator-nodejs-gitlab` <br />
+> Push to your repo <br />
+`git push origin master`
+
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/26.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/26.png" alt="airflow2-dockeroperator-nodejs-gitlab-26-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+2. <a href="https://docs.docker.com/engine/reference/commandline/login/#privileged-user-requirement" target="_blank" rel="noopener noreferrer">
+  You need to login to the Gitlab container registry from docker on your local machine (this step also needs to be done on the server). Basically, this step generates the required file at `~/.docker/config.json`
+  </a>
+```shell
+sudo docker login registry.gitlab.com
+
+WARNING! Your password will be stored unencrypted in /root/.docker/config.json.
+Configure a credential helper to remove this warning. See
+https://docs.docker.com/engine/reference/commandline/login/#credentials-store
+
+Login Succeeded
+```
+
+3. Copy and update config json access on your local machine (this step also needs to be done on the server)
+```shell
+mkdir ~/.docker && sudo cp /root/.docker/config.json ~/.docker/config.json && sudo cat ~/.docker/config.json && sudo chmod 777 ~/.docker/config.json
+```
+
+4. Publish container to Gitlab from local from the root where Dockerfile is present (this will need the local docker daemon to be running, if not already then start it)
+```shell
+sudo docker build -t registry.gitlab.com/blogs-imsheth-com/airflow2-dockeroperator-nodejs-gitlab . && sudo docker push registry.gitlab.com/blogs-imsheth-com/airflow2-dockeroperator-nodejs-gitlab
+```
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/27.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/27.png" alt="airflow2-dockeroperator-nodejs-gitlab-27-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/28.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/28.png" alt="airflow2-dockeroperator-nodejs-gitlab-28-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+5. This completes Gitlab container registry installation and setup
+
+
+
+
+
+---
+## Airflow DAGs
+- DAGs will run the nodejs code
+- <a href="https://github.com/apache/airflow/blob/master/airflow/providers/docker/example_dags/example_docker.py" target="_blank" rel="noopener noreferrer">
+  Sample DAG for DockerOperator
+  </a>
+- <a href="https://github.com/imsheth/airflow2-dockeroperator-nodejs-gitlab" target="_blank" rel="noopener noreferrer">
+  Clone your repo on server, source for current post can be found here
+  </a>
+
+1. Activate virtual environment, clone at proper path, install dependencies
+```shell
+cd airflow && source airflow_venv/bin/activate
+cd ~/dags_root/ && git clone https://github.com/imsheth/airflow2-dockeroperator-nodejs-gitlab && cd airflow2-dockeroperator-nodejs-gitlab/dags && pip install -r requirements.txt
+```
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/29.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/29.png" alt="airflow2-dockeroperator-nodejs-gitlab-29-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+2. Your DAG is now available, first enable/unpause before triggering and then trigger it
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/30.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/30.png" alt="airflow2-dockeroperator-nodejs-gitlab-30-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+3. Trigger your DAG run
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/31.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/31.png" alt="airflow2-dockeroperator-nodejs-gitlab-31-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+4. DAG run successful
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/32.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/32.png" alt="airflow2-dockeroperator-nodejs-gitlab-32-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+5. DAG run details for the successful run
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/33.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/33.png" alt="airflow2-dockeroperator-nodejs-gitlab-33-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+6. DAG run task details graph view for the successful run
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/34.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/34.png" alt="airflow2-dockeroperator-nodejs-gitlab-34-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+7. Task detail from DAG run task details graph view for the successful run
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/35.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/35.png" alt="airflow2-dockeroperator-nodejs-gitlab-35-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+8. Task log from DAG run task details graph view for the successful run
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/36.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/36.png" alt="airflow2-dockeroperator-nodejs-gitlab-36-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+9. This completes DAG run with DockerOperator in Airflow, however keep in mind that minimum AWS EC2 t2.medium equivalent instance will be required on the server to just run the DAGs with DockerOperator in Airflow 
+
+
+
+
+
+---
+## systemd service
+- <a href="https://github.com/apache/airflow/tree/master/scripts/systemd" target="_blank" rel="noopener noreferrer">
+  Sample scripts
+  </a>
+- <a href="https://medium.com/@shahbaz.ali03/run-apache-airflow-as-a-service-on-ubuntu-18-04-server-b637c03f4722" target="_blank" rel="noopener noreferrer">
+  Running Apache-Airflow as a service
+  </a>
+- <a href="https://medium.com/@vando/airflow-inside-a-virtual-enviroment-and-integrated-with-systemd-3b6427bd6430" target="_blank" rel="noopener noreferrer">
+  Running Apache-Airflow as a service in virtual environment
+  </a>
+- <a href="https://www.freedesktop.org/software/systemd/man/systemd.service.html" target="_blank" rel="noopener noreferrer">
+  systemd manual
+  </a>
+- <a href="https://medium.com/@achilleus/easy-way-to-manage-your-airflow-setup-b7c030dd1cb8" target="_blank" rel="noopener noreferrer">
+  Running Apache-Airflow as a service in virtual environment
+  </a>
+- <a href="https://tech.akom.net/archives/93-Getting-a-systemd-unit-to-read-your-.bashrc-file-for-its-environment.html" target="_blank" rel="noopener noreferrer">
+  systemd unit doesn't interpolate variables and it will ignore lines starting with "export" in .bashrc
+  </a>
+
+
+1. systemd unit doesn't interpolate variables and it will ignore lines starting with "export" in .bashrc, which causes the issue on server restart as the variables are not exported (add the following to a startup script)
+```shell
+env > /tmp/.magic-environment-file
+```
+
+2. <a href="https://github.com/imsheth/airflow2-dockeroperator-nodejs-gitlab/tree/master/services" target="_blank" rel="noopener noreferrer">
+  Service configurations
+  </a>
+```shell
+sudo vim /etc/systemd/system/airflow-webserver.service
+```
+> [Unit] <br />
+> Description=Airflow webserver daemon service template for Ubuntu 20.04.2 <br />
+> After=network.target postgresql.service <br />
+> Wants=postgresql.service <br />
+> [Service] <br />
+> #PIDFile=/run/airflow/webserver.pid <br />
+> User=ubuntu <br />
+> Group=ubuntu <br />
+> Type=simple <br />
+> EnvironmentFile=-/tmp/.magic-environment-file <br />
+ExecStart=/usr/bin/bash -c 'source /home/ubuntu/airflow/airflow_venv/bin/activate ; /home/ubuntu/airflow/airflow_venv/bin/airflow db upgrade ; /home/> ubuntu/airflow/airflow_venv/bin/airflow webserver' <br />
+> Restart=on-failure <br />
+> RestartSec=60s <br />
+> PrivateTmp=true <br />
+> [Install] <br />
+> WantedBy=multi-user.target <br />
+
+```shell
+sudo vim /etc/systemd/system/airflow-scheduler.service
+```
+> [Unit] <br />
+> Description=Airflow scheduler daemon service template for Ubuntu 20.04.2 <br />
+> After=network.target postgresql.service <br />
+> Wants=postgresql.service <br />
+> [Service] <br />
+> #PIDFile=/run/airflow/scheduler.pid <br />
+> User=ubuntu <br />
+> Group=ubuntu <br />
+> Type=simple <br />
+> EnvironmentFile=-/tmp/.magic-environment-file <br />
+> ExecStart=/usr/bin/bash -c 'source /home/ubuntu/airflow/airflow_venv/bin/activate ; /home/ubuntu/airflow/airflow_venv/bin/airflow scheduler' <br />
+> Restart=on-failure <br />
+> RestartSec=60s <br />
+> PrivateTmp=true <br />
+> [Install] <br />
+> WantedBy=multi-user.target <br />
+
+3. Reload daemon, enable and start services
+```shell
+sudo systemctl daemon-reload && sudo systemctl enable airflow-webserver.service && sudo systemctl enable airflow-scheduler.service && sudo systemctl start airflow-webserver.service && sudo systemctl start airflow-scheduler.service
+```
+
+4. Check service status
+```shell
+systemctl status airflow-webserver.service
+```
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/37.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/37.png" alt="airflow2-dockeroperator-nodejs-gitlab-37-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+5. Check service status
+```shell
+systemctl status airflow-scheduler.service
+```
+<a href="/posts/airflow2-dockeroperator-nodejs-gitlab/38.png" target="_blank" rel="noopener noreferrer">
+  <img src="/posts/airflow2-dockeroperator-nodejs-gitlab/38.png" alt="airflow2-dockeroperator-nodejs-gitlab-38-png" align="left" style="margin-right: 2rem; margin-bottom: 1rem" />
+</a>
+
+6. Checking sysetmd logs
+```shell
+journalctl -xe
+```
+
+7. <a href="https://unix.stackexchange.com/questions/225401/how-to-see-full-log-from-systemctl-status-service" target="_blank" rel="noopener noreferrer">
+  Check full systemd logs
+  </a>
+```shell
+journalctl -u airflow-webserver.service -e
+```
+
+8. Check live logs
+```shell
+journalctl -u airflow-webserver.service -e -f
+```
+
+
+
+
+
+---
+## Deployment
+
+1. This command can be added to your deployment pipeline
+```shell
+cd /home/ubuntu/dags_root/airflow2-dockeroperator-nodejs-gitlab/dags && source /home/ubuntu/airflow/airflow_venv/bin/activate && git pull && pip install -r /home/ubuntu/dags_root/airflow2-dockeroperator-nodejs-gitlab/dags/requirements.txt && sudo systemctl stop airflow-webserver.service && sudo systemctl start airflow-webserver.service && sudo systemctl stop airflow-scheduler.service && sudo systemctl start airflow-scheduler.service
+```
+
+
+
+
+
+---
+## Unsuccessful trials
+
+1. Trials with airflow2 inside docker
+- https://www.youtube.com/watch?v=aTaytcxy2Ck
+- https://airflow.apache.org/docs/apache-airflow/stable/docker-compose.yaml with edits for permissions for docker installation, which failed miserably
+- https://stackoverflow.com/questions/41381350/docker-compose-installing-requirements-txt
+- https://stackoverflow.com/questions/45211594/running-a-custom-script-using-entrypoint-in-docker-compose
+
+2. Trials with airflow2 inside docker with DockerOperator (docker inside docker)
+- https://www.youtube.com/watch?v=4_rQSkN1joA
+- https://stackoverflow.com/questions/59765453/how-to-use-the-dockeroperator-from-apache-airflow
+
+3. Referred initially but not used fully
+- https://vujade.co/install-apache-airflow-ubuntu-18-04/
+- https://towardsdatascience.com/setting-up-apache-airflow-2-with-docker-e5b974b37728
+
+
+
+
+
+---
+## Miscellaneous
+
+1. Purging all unused or dangling images, containers, volumes, and networks. This was used in research and development phase
+```shell
+docker system prune -af
+
+docker images -a
+docker container ls
+docker ps -a
+```
+
+2. <a href="https://airflow.apache.org/docs/apache-airflow-providers-docker/stable/_api/airflow/providers/docker/operators/docker/index.html" target="_blank" rel="noopener noreferrer">
+  Important parameters for DockerOperator, which helped avoid commands in above point
+  </a>
+
+> Sample at https://github.com/imsheth/airflow2-dockeroperator-nodejs-gitlab/blob/master/dags/docker_provider.py <br />
+> force_pull = True <br />
+> xcom_all = True <br />
+> auto_remove = True <br />
+> tty = True <br />
+
+
+3. SSH for deployment
+```shell
+ssh-keygen -t rsa -b 2048 -C "john@thehightable.org"
+```
+
+4. Add to repo for deploy keys
+```shell
+cat id_rsa.pub
+```
+
+5. For running DAGs with DockerOperator
+- <a href="https://github.com/docker/for-mac/issues/770#issuecomment-252560286" target="_blank" rel="noopener noreferrer">
+  Docker for Mac doesn't listen on 2375
+  </a>
+- <a href="https://github.com/docker/docker-py/issues/1916" target="_blank" rel="noopener noreferrer">
+  docker.from_env() causes TypeError: load_config() got an unexpected keyword argument 'config_dict'
+  </a>
+
+6. Gitlab registry
+- <a href="https://stackoverflow.com/questions/58733579/airflow-pull-docker-image-from-private-google-container-repository" target="_blank" rel="noopener noreferrer">
+  Airflow pull docker image from private google container repository
+  </a>
+- <a href="https://stackoverflow.com/a/65219624/3152654" target="_blank" rel="noopener noreferrer">
+  No Docker registry URL provided
+  </a>
+
+7. docker remote API
+- <a href="https://blog.usejournal.com/how-to-enable-docker-remote-api-on-docker-host-7b73bd3278c6" target="_blank" rel="noopener noreferrer">
+  Enabling docker remote API
+  </a>
+```shell
+ExecStart=/usr/bin/dockerd -H fd:// -H 0.0.0.0:2375 --containerd=/run/containerd/containerd.sock
+```
+- <a href="https://www.redhat.com/sysadmin/getting-started-socat" target="_blank" rel="noopener noreferrer">
+  Connecting to docker remote API via socat
+  </a>
+```shell
+DOCKER_GROUP_ID=`getent group docker | cut -d: -f3` sudo docker-compose up -d
+docker run -d -v /var/run/docker.sock:/var/run/docker.sock -p 127.0.0.1:2375:2375 bobrik/socat TCP-LISTEN:2375,fork UNIX-CONNECT:/var/run/docker.sock
+```
+
+8. macOS issues
+- <a href="https://github.com/apache/airflow/issues/10435" target="_blank" rel="noopener noreferrer">
+  Negsignal.SIGKILL error on macOS
+  </a>
+- <a href="https://stackoverflow.com/a/59828133/3152654" target="_blank" rel="noopener noreferrer">
+  Airflow task running tweepy exits with return code -6
+  </a>
+- <a href="https://stackoverflow.com/a/52230415/3152654" target="_blank" rel="noopener noreferrer">
+  Multiprocessing causes Python to crash and gives an error may have been in progress in another thread when fork() was called
+  </a>
+
+7. Check docker container logs
+```shell
+sudo docker ps
+sudo docker exec -it 82f4b968cb6d sh
+sudo docker-compose logs --tail="all" -f
+```
+
+
+
+
+
+
+
+
+`#airflow` `#airflow2` `#apacheairflow` `#apacheairflow2.0.1` `#dockeroperator` `#docker` `#python` `#python3.6` `#pip` `#pip20.2.4` `#ubuntu` `#ubuntu20.04.2lts` `#tech`
+
+
+
+
+
+---
+
+<div style="text-align: left; margin-top: 0.55rem; margin-bottom: 0.40rem;">
+  <a href="https://twitter.com/theimsheth" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">
+    <img src="/social/twitter.svg" alt="twitter" style="height: 32px; width: 32px; margin: .2rem" />
+  </a>
+  <a href="https://github.com/imsheth" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">
+    <img src="/social/github.svg" alt="github" style="height: 32px; width: 32px; margin: .2rem" />
+  </a>
+  <a href="https://www.npmjs.com/~imsheth" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">
+    <img src="/social/npm.svg" alt="npm" style="height: 32px; width: 32px; margin: .2rem" />
+  </a>
+  <a href="https://stackoverflow.com/users/3152654/imsheth?tab=profile" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">
+    <img src="/social/stackoverflow.svg" alt="stackoverflow" style="height: 32px; width: 32px; margin: .2rem" />
+  </a>
+  <a href="https://in.linkedin.com/in/imsheth" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">
+    <img src="/social/linkedin.svg" alt="linkedin" style="height: 32px; width: 32px; margin: .2rem" />
+  </a>
+  <a href="https://instagram.com/imsheth/" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">
+    <img src="/social/instagram.svg" alt="instagram" style="height: 32px; width: 32px; margin: .2rem" />
+  </a>
+  <a href="https://www.facebook.com/imsheth" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">
+    <img src="/social/facebook.svg" alt="facebook" style="height: 32px; width: 32px; margin: .2rem" />
+  </a>
+  <a href="https://open.spotify.com/user/orekqqr23uij1ehi7upg9akat?si=xXA0ZUqxQW2GgFYzdXgAOA&nd=1" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">
+    <img src="/social/spotify.svg" alt="spotify" style="height: 32px; width: 32px; margin: .2rem" />
+  </a>
+  <a href="https://www.tvshowtime.com/1589595" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">
+    <img src="/social/tvtime.svg" alt="tvshowtime" style="height: 32px; width: 32px; margin: .2rem" />
+  </a>
+  
+</div>
