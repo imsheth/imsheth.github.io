@@ -4,9 +4,9 @@
 <url> <loc>https://imsheth.com/talks/tags/tech</loc> <changefreq>daily</changefreq> <priority>0.7</priority> </url>
 <url> <loc>https://imsheth.com/posts/tags/etc</loc> <changefreq>daily</changefreq> <priority>0.7</priority> </url>
 <url> <loc>https://imsheth.com/posts/tags/food</loc> <changefreq>daily</changefreq> <priority>0.7</priority> </url>
+<url> <loc>https://imsheth.com/posts/tags/tech</loc> <changefreq>daily</changefreq> <priority>0.7</priority> </url>
+<url> <loc>https://imsheth.com/posts/tags/tech/airflow2-dockeroperator-nodejs-gitlab</loc> <changefreq>daily</changefreq> <priority>0.7</priority> </url>
 <url> <loc>https://imsheth.com/posts/tags/travel</loc> <changefreq>daily</changefreq> <priority>0.7</priority> </url>
 <url> <loc>https://imsheth.com/posts/tags/etc/the-art-of-demanding</loc> <changefreq>daily</changefreq> <priority>0.7</priority> </url>
 <url> <loc>https://imsheth.com/misc/tags/gratitude</loc> <changefreq>daily</changefreq> <priority>0.7</priority> </url>
-<url> <loc>https://imsheth.com/posts/tags/tech/airflow2-dockeroperator-nodejs-gitlab</loc> <changefreq>daily</changefreq> <priority>0.7</priority> </url>
-<url> <loc>https://imsheth.com/posts/tags/tech</loc> <changefreq>daily</changefreq> <priority>0.7</priority> </url>
 </urlset>
