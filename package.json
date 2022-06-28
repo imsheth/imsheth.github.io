@@ -1,12 +1,13 @@
 {
   "name": "imsheth",
   "private": false,
-  "version": "4.0.0",
+  "version": "4.0.1",
   "description": "The source code for https://imsheth.com, built on https://github.com/Rocketseat/gatsby-starter-rocket-docs",
   "author": "Ishan Sheth (@imsheth)",
   "license": "MIT",
   "starter-name": "gatsby-starter-rocket-docs",
   "dependencies": {
+    "@giscus/react": "^2.0.6",
     "@rocketseat/gatsby-theme-docs": "^2.3.1",
     "gatsby": "^3.0.4",
     "gatsby-plugin-canonical-urls": "^3.0.0",
@@ -37,5 +38,8 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/imsheth/imsheth.github.io.git"
+  },
+  "engines" : { 
+    "node" : "12.22.12"
   }
 }
