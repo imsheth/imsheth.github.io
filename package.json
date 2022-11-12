@@ -1,7 +1,7 @@
 {
   "name": "imsheth",
   "private": false,
-  "version": "4.0.2",
+  "version": "4.0.3",
   "description": "The source code for https://imsheth.com, built on https://github.com/Rocketseat/gatsby-starter-rocket-docs",
   "author": "Ishan Sheth (@imsheth)",
   "license": "MIT",
@@ -12,6 +12,7 @@
     "gatsby": "^3.0.4",
     "gatsby-plugin-canonical-urls": "^3.0.0",
     "gatsby-plugin-google-analytics": "^3.0.0",
+    "gatsby-plugin-gtag": "^1.0.13",
     "gatsby-plugin-manifest": "^3.0.0",
     "gatsby-plugin-offline": "^4.0.0",
     "gatsby-plugin-remove-trailing-slashes": "^3.0.0",
