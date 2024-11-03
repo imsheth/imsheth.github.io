@@ -1,0 +1,1458 @@
+---
+title: "The Hows - OpenAI APIs with node.js and react on macOS Ventura 13.7"
+description: "This post is focused on using node.js and react to integrate with OpenAI APIs on macOS Ventura 13.7"
+image: /posts/airflow2-dockeroperator-nodejs-gitlab/airflow2-dockeroperator-nodejs-gitlab-banner.png
+disableTableOfContents: false
+---
+
+`Oct 17, 2024`
+
+<blockquote>
+  <p style="text-align:center">
+    The motivation for writing this post is that it provides a single concise
+    starting point to explore OpenAI with node.js and react.
+  </p>
+</blockquote>
+
+This post is focused on using node.js 19.6.0 and react to integrate with openai 4.68.0 package on macOS Ventura 13.7
+
+<a
+  href="https://github.com/imsheth/openai-nodejs-react"
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  The relevant source code for the post can be found here
+</a>
+<br />
+<br />
+
+---
+
+## OpenAI 4.68.0
+
+- <a href="https://openai.com/" target="_blank" rel="noopener noreferrer">
+    OpenAI
+  </a> is the organization that created <a
+    href="https://platform.openai.com/docs/models"
+    target="_blank"
+    rel="noopener noreferrer"
+  >
+    generative AI models
+  </a> and packaged it into a product called <a
+    href="https://chat.openai.com/"
+    target="_blank"
+    rel="noopener noreferrer"
+  >
+    ChatGPT
+  </a>
+- Using <a href="https://chat.openai.com/" target="_blank" rel="noopener noreferrer" > ChatGPT </a> is free (ChatGPT Plus and ChatGPT Team are paid) but using <a href="https://community.openai.com/t/is-playground-free/18909/14" target="_blank" rel="noopener noreferrer" > OpenAI playground </a> is not after you exhaust your free credits (if any)
+- We'll be using <a href="https://www.npmjs.com/package/openai" target="_blank" rel="noopener noreferrer" > OpenAI Node API Library openai 4.68.0 </a>
+
+1. <a
+     href="https://platform.openai.com/docs/overview"
+     target="_blank"
+     rel="noopener noreferrer"
+   >
+     Sign up for an OpenAI account
+   </a>
+2. <a
+     href="https://platform.openai.com/settings/organization/billing/overview"
+     target="_blank"
+     rel="noopener noreferrer"
+   >
+     Add payment method and add credits to balance
+   </a>
+3. <a
+     href="https://platform.openai.com/api-keys"
+     target="_blank"
+     rel="noopener noreferrer"
+   >
+     Create new secret key and copy it
+   </a>
+
+   - For the "Owned by"
+
+     - <b>You</b> is better for personal use and if you're going to be the only person
+       making API calls. This API key is tied to your user and can make requests
+       against the selected project. If you are removed from the organization or
+       project, this key will be disabled. The "Permissions" setting lets you adjust
+       the permissions and granularity the key will have.
+
+     - <b>Service account</b> is for organizational use and adds more security layers,
+       so it's suitable for programmatic API calls through the app/system you're
+       building. This API key is not tied to your user and can make requests against
+       the selected project. If you are removed from the organization or project,
+       this key will not be disabled.
+
+<a
+  href="/posts/openai-nodejs-react/1.png"
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  <img
+    src="/posts/openai-nodejs-react/1.png"
+    alt="openai-nodejs-react-1-png"
+    align="left"
+    style="margin-right: 2rem; margin-bottom: 1rem"
+  />
+</a>
+
+<a
+  href="/posts/openai-nodejs-react/2.png"
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  <img
+    src="/posts/openai-nodejs-react/2.png"
+    alt="openai-nodejs-react-2-png"
+    align="left"
+    style="margin-right: 2rem; margin-bottom: 1rem"
+  />
+</a>
+
+<a
+  href="/posts/openai-nodejs-react/3.png"
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  <img
+    src="/posts/openai-nodejs-react/3.png"
+    alt="openai-nodejs-react-3-png"
+    align="left"
+    style="margin-right: 2rem; margin-bottom: 1rem"
+  />
+</a>
+
+## node.js 19.6.0
+
+1. Initialize project, install packages, create server file and assign environment variable for server port, api key
+
+```shell
+mkdir server && cd server && npm init -y && npm install --save express body-parser cors openai && touch index.js && export OPENAI_API_SERVER_PORT=8080 && export OPENAI_API_KEY="<your_api_key_here>"
+```
+
+2. Add the following line to `package.json` <a href="https://nodejs.org/api/packages.html#determining-module-system" target="_blank" rel="noopener noreferrer" > to make the server file an ES module</a>
+
+```shell
+"type": "module",
+```
+
+3. Below `node.js` code exposes endpoints that in-turn call OpenAI APIs and <a href="https://github.com/imsheth/openai-nodejs-react/tree/main/postman-collection" target="_blank" rel="noopener noreferrer" > the relevant postman collection v2.1 can be found here</a>
+
+```javascript
+// Import packages
+import express from "express";
+import bodyParser from "body-parser";
+import OpenAI from "openai";
+import cors from "cors";
+import fs from "fs";
+import path from "path";
+
+// Initialize
+const app = express();
+const port = process.env["OPENAI_API_SERVER_PORT"];
+const openai = new OpenAI();
+const generatedSpeechFile = path.resolve("./generated_speech.mp3");
+let threadRunStatusInterval;
+
+// Parse incoming requests with JSON payloads
+// Body parser is a middleware for Node.js that parses incoming request bodies and makes them available as objects in the req.body property
+// https://medium.com/@amirakhaled2027/body-parser-middleware-in-node-js-75b6b9a36613
+app.use(bodyParser.json());
+
+// Allow CORS
+app.use(cors());
+
+// Setup server on specified port
+app.listen(port, () => {
+  console.log(`Server listening on port ${port}`);
+});
+
+// POST /text_generation/chat_completions that calls OpenAI API
+// API reference https://platform.openai.com/docs/api-reference/chat/create
+// API library https://github.com/openai/openai-node/blob/master/api.md
+app.post("/text_generation/chat_completions", async (request, response) => {
+  const { chats } = request.body;
+
+  const result = await openai.chat.completions.create({
+    model: "gpt-3.5-turbo",
+    messages: [
+      { role: "system", content: "You are a texas cowboy." },
+      ...chats,
+    ],
+  });
+
+  response.json({
+    output: result.choices[0].message,
+  });
+});
+
+// POST /image_generation/images that calls OpenAI API
+// API reference https://platform.openai.com/docs/api-reference/images/create
+// API library https://github.com/openai/openai-node/blob/master/api.md
+app.post("/image_generation/images", async (request, response) => {
+  const generatedImage = await openai.images.generate({
+    model: "dall-e-3",
+    prompt: request.body.prompt_message,
+    size: "1024x1024",
+    quality: "standard",
+    n: 1,
+  });
+
+  response.json({
+    output: {
+      imageURL: generatedImage.data[0].url,
+    },
+  });
+});
+
+// // POST /vision/images that calls OpenAI API
+// API reference https://platform.openai.com/docs/api-reference/chat/create
+// API library https://github.com/openai/openai-node/blob/master/api.md
+app.post("/vision/images", async (request, response) => {
+  const visionComprehension = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "What's in this image?" },
+          {
+            type: "image_url",
+            image_url: {
+              url: request.body.image_url,
+            },
+          },
+        ],
+      },
+    ],
+  });
+  response.json({
+    output: {
+      imageURL: request.body.image_url,
+      imageComprehension: visionComprehension.choices[0],
+    },
+  });
+});
+
+// POST /text_to_speech/audio_speeches that calls OpenAI API
+// API reference https://platform.openai.com/docs/api-reference/audio/createSpeech
+// API library https://github.com/openai/openai-node/blob/master/api.md
+// Supported languages https://platform.openai.com/docs/guides/text-to-speech/supported-languages
+// You can generate spoken audio in these languages by providing the input text in the language of your choice.
+// Afrikaans, Arabic, Armenian, Azerbaijani, Belarusian, Bosnian, Bulgarian, Catalan,
+// Chinese, Croatian, Czech, Danish, Dutch, English, Estonian, Finnish, French, Galician,
+// German, Greek, Hebrew, Hindi, Hungarian, Icelandic, Indonesian, Italian, Japanese, Kannada,
+// Kazakh, Korean, Latvian, Lithuanian, Macedonian, Malay, Marathi, Maori, Nepali, Norwegian,
+// Persian, Polish, Portuguese, Romanian, Russian, Serbian, Slovak, Slovenian, Spanish, Swahili,
+// Swedish, Tagalog, Tamil, Thai, Turkish, Ukrainian, Urdu, Vietnamese, and Welsh
+// Thought not specified, it also supports Gujarati
+app.post("/text_to_speech/audio_speeches", async (request, response) => {
+  const generatedSpeech = await openai.audio.speech.create({
+    model: "tts-1",
+    response_format: "mp3",
+    voice: "onyx",
+    input: request.body.prompt_message,
+    speed: "1",
+  });
+
+  const buffer = Buffer.from(await generatedSpeech.arrayBuffer());
+  await fs.promises.writeFile(generatedSpeechFile, buffer);
+
+  console.log("generatedSpeechFile ", generatedSpeechFile);
+
+  response.json({
+    output: {
+      speechFileGeneration: "successful",
+    },
+  });
+});
+
+// POST /speech_to_text/audio_transcrptions that calls OpenAI API
+// API reference https://platform.openai.com/docs/api-reference/audio/createTranscription
+// API library https://github.com/openai/openai-node/blob/master/api.md
+// Thought not specified, it doesn't support Gujarati and lacks accuracy for Hindi
+app.post("/speech_to_text/audio_transcrptions", async (request, response) => {
+  const speechTranscription = await openai.audio.transcriptions.create({
+    file: fs.createReadStream(generatedSpeechFile),
+    model: "whisper-1",
+    response_format: "json",
+  });
+
+  console.log("speechTranscription ", speechTranscription);
+
+  response.json({
+    output: {
+      speechTranscript: speechTranscription.text,
+    },
+  });
+});
+
+// POST /speech_to_text/audio_translations that calls OpenAI API
+// API reference https://platform.openai.com/docs/api-reference/audio/createTranslation
+// API library https://github.com/openai/openai-node/blob/master/api.md
+app.post("/speech_to_text/audio_translations", async (request, response) => {
+  const speechTranslation = await openai.audio.translations.create({
+    file: fs.createReadStream(generatedSpeechFile),
+    model: "whisper-1",
+    response_format: "json",
+  });
+
+  console.log("speechTranslation ", speechTranslation);
+
+  response.json({
+    output: {
+      speechTranslated: speechTranslation.text,
+    },
+  });
+});
+
+// POST /vector_embeddings/embeddings that calls OpenAI API
+// API reference https://platform.openai.com/docs/api-reference/embeddings/create
+// API library https://github.com/openai/openai-node/blob/master/api.md
+app.post("/vector_embeddings/embeddings", async (request, response) => {
+  const embedding = await openai.embeddings.create({
+    model: "text-embedding-3-small",
+    input: request.body.input_text.replace(/[\n\r]/g, " "),
+    encoding_format: "float",
+    dimensions: 512,
+  });
+
+  console.log("embedding ", embedding);
+
+  response.json({
+    output: {
+      embeddedVector: embedding.data[0].embedding,
+    },
+  });
+});
+
+// POST /moderation/moderations that calls OpenAI API
+// API reference https://platform.openai.com/docs/api-reference/moderations
+// API library https://github.com/openai/openai-node/blob/master/api.md
+// Text moderation works only for English
+app.post("/moderation/moderations", async (request, response) => {
+  let inputContent = [];
+  inputContent.push({ type: "text", text: request.body.input_text });
+  if (request.body.input_url) {
+    inputContent.push({
+      type: "image_url",
+      image_url: {
+        url: request.body.input_url,
+      },
+    });
+  }
+  console.log("inputContent ", inputContent);
+  const moderation = await openai.moderations.create({
+    model: "omni-moderation-latest",
+    input: inputContent,
+  });
+
+  response.json({
+    output: {
+      moderationAnalysis: moderation.results,
+    },
+  });
+});
+
+// POST /reasoning/chat_completions that calls OpenAI API
+// API reference https://platform.openai.com/docs/api-reference/chat
+// API library https://github.com/openai/openai-node/blob/master/api.md
+// Text moderation works for English and not Hindi/Gujarati
+app.post("/reasoning/chat_completions", async (request, response) => {
+  const completion = await openai.chat.completions.create({
+    model: "o1-preview",
+    messages: [
+      {
+        role: "user",
+        content: request.body.input_text.trim(),
+      },
+    ],
+  });
+
+  response.json({
+    output: completion.choices[0].message,
+  });
+});
+
+// POST /assistant/assistants that calls OpenAI API
+// API reference https://platform.openai.com/docs/api-reference/assistants/createAssistant
+// API library https://github.com/openai/openai-node/blob/master/api.md
+app.post("/assistant/assistants", async (request, response) => {
+  const assistant = await openai.beta.assistants.create({
+    name: request.body.input_assistant_name,
+    description: request.body.input_assistant_desc,
+    model: "gpt-4o",
+    // tools: [{ type: "code_interpreter" }],
+  });
+
+  response.json({
+    output: assistant,
+  });
+});
+
+// POST /assistant/threads that calls OpenAI API
+// API reference https://platform.openai.com/docs/api-reference/threads
+// API library https://github.com/openai/openai-node/blob/master/api.md
+app.post("/assistant/threads", async (request, response) => {
+  const thread = await openai.beta.threads.create();
+
+  response.json({
+    output: thread,
+  });
+});
+
+async function checkThreadRunStatus(res, threadId, runId) {
+  const threadRunStatusResponse = await openai.beta.threads.runs.retrieve(
+    threadId,
+    runId
+  );
+  console.log(
+    "threadRunStatusResponse.status " + threadRunStatusResponse.status
+  );
+
+  if (threadRunStatusResponse.status == "completed") {
+    clearInterval(threadRunStatusInterval);
+
+    const threadMessages = await openai.beta.threads.messages.list(threadId);
+    let messages = [];
+
+    threadMessages.body.data.forEach((message) => {
+      messages.push(message.content);
+    });
+
+    res.json({ messages });
+  }
+}
+
+// POST /assistant/messages that calls OpenAI API
+// API reference https://platform.openai.com/docs/api-reference/messages
+// API library https://github.com/openai/openai-node/blob/master/api.md
+app.post("/assistant/messages", async (request, response) => {
+  const message = await openai.beta.threads.messages.create(
+    request.body.thread_id,
+    {
+      role: "user", // "user" or "assistant" only
+      content: request.body.input_message,
+    }
+  );
+
+  const threadRun = await openai.beta.threads.runs.create(message.thread_id, {
+    assistant_id: request.body.assistant_id,
+  });
+
+  // Check status and return response if run is completed
+  threadRunStatusInterval = setInterval(() => {
+    checkThreadRunStatus(response, message.thread_id, threadRun.id);
+  }, 2500);
+});
+```
+
+4. Run the server and test the endpoints
+
+```shell
+node -v && node index.js
+```
+
+<a
+  href="/posts/openai-nodejs-react/4.png"
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  <img
+    src="/posts/openai-nodejs-react/4.png"
+    alt="openai-nodejs-react-4-png"
+    align="left"
+    style="margin-right: 2rem; margin-bottom: 1rem"
+  />
+</a>
+
+<a
+  href="/posts/openai-nodejs-react/5.png"
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  <img
+    src="/posts/openai-nodejs-react/5.png"
+    alt="openai-nodejs-react-5-png"
+    align="left"
+    style="margin-right: 2rem; margin-bottom: 1rem"
+  />
+</a>
+
+<a
+  href="/posts/openai-nodejs-react/6.png"
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  <img
+    src="/posts/openai-nodejs-react/6.png"
+    alt="openai-nodejs-react-6-png"
+    align="left"
+    style="margin-right: 2rem; margin-bottom: 1rem"
+  />
+</a>
+
+<a
+  href="/posts/openai-nodejs-react/7.png"
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  <img
+    src="/posts/openai-nodejs-react/7.png"
+    alt="openai-nodejs-react-7-png"
+    align="left"
+    style="margin-right: 2rem; margin-bottom: 1rem"
+  />
+</a>
+
+<a
+  href="/posts/openai-nodejs-react/8.png"
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  <img
+    src="/posts/openai-nodejs-react/8.png"
+    alt="openai-nodejs-react-8-png"
+    align="left"
+    style="margin-right: 2rem; margin-bottom: 1rem"
+  />
+</a>
+
+<a
+  href="/posts/openai-nodejs-react/9.png"
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  <img
+    src="/posts/openai-nodejs-react/9.png"
+    alt="openai-nodejs-react-9-png"
+    align="left"
+    style="margin-right: 2rem; margin-bottom: 1rem"
+  />
+</a>
+
+<a
+  href="/posts/openai-nodejs-react/10.png"
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  <img
+    src="/posts/openai-nodejs-react/10.png"
+    alt="openai-nodejs-react-10-png"
+    align="left"
+    style="margin-right: 2rem; margin-bottom: 1rem"
+  />
+</a>
+
+<a
+  href="/posts/openai-nodejs-react/11.png"
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  <img
+    src="/posts/openai-nodejs-react/11.png"
+    alt="openai-nodejs-react-11-png"
+    align="left"
+    style="margin-right: 2rem; margin-bottom: 1rem"
+  />
+</a>
+
+<a
+  href="/posts/openai-nodejs-react/12.png"
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  <img
+    src="/posts/openai-nodejs-react/12.png"
+    alt="openai-nodejs-react-12-png"
+    align="left"
+    style="margin-right: 2rem; margin-bottom: 1rem"
+  />
+</a>
+
+<a
+  href="/posts/openai-nodejs-react/13.png"
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  <img
+    src="/posts/openai-nodejs-react/13.png"
+    alt="openai-nodejs-react-13-png"
+    align="left"
+    style="margin-right: 2rem; margin-bottom: 1rem"
+  />
+</a>
+
+<a
+  href="/posts/openai-nodejs-react/14.png"
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  <img
+    src="/posts/openai-nodejs-react/14.png"
+    alt="openai-nodejs-react-14-png"
+    align="left"
+    style="margin-right: 2rem; margin-bottom: 1rem"
+  />
+</a>
+
+<a
+  href="/posts/openai-nodejs-react/15.png"
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  <img
+    src="/posts/openai-nodejs-react/15.png"
+    alt="openai-nodejs-react-15-png"
+    align="left"
+    style="margin-right: 2rem; margin-bottom: 1rem"
+  />
+</a>
+
+<a
+  href="/posts/openai-nodejs-react/16.png"
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  <img
+    src="/posts/openai-nodejs-react/16.png"
+    alt="openai-nodejs-react-16-png"
+    align="left"
+    style="margin-right: 2rem; margin-bottom: 1rem"
+  />
+</a>
+
+<a
+  href="/posts/openai-nodejs-react/17.png"
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  <img
+    src="/posts/openai-nodejs-react/17.png"
+    alt="openai-nodejs-react-17-png"
+    align="left"
+    style="margin-right: 2rem; margin-bottom: 1rem"
+  />
+</a>
+
+<a
+  href="/posts/openai-nodejs-react/18.png"
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  <img
+    src="/posts/openai-nodejs-react/18.png"
+    alt="openai-nodejs-react-18-png"
+    align="left"
+    style="margin-right: 2rem; margin-bottom: 1rem"
+  />
+</a>
+
+<a
+  href="/posts/openai-nodejs-react/19.png"
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  <img
+    src="/posts/openai-nodejs-react/19.png"
+    alt="openai-nodejs-react-19-png"
+    align="left"
+    style="margin-right: 2rem; margin-bottom: 1rem"
+  />
+</a>
+
+<a
+  href="/posts/openai-nodejs-react/20.png"
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  <img
+    src="/posts/openai-nodejs-react/20.png"
+    alt="openai-nodejs-react-20-png"
+    align="left"
+    style="margin-right: 2rem; margin-bottom: 1rem"
+  />
+</a>
+
+## react-app
+
+1. Create a `react-app` using <a href="https://create-react-app.dev/" target="_blank" rel="noopener noreferrer">create-react-app </a> and local environment is ready at `http://localhost:3000/`
+
+```shell
+npx create-react-app react-app && cd react-app && export OPENAI_API_SERVER_PORT=8080 && npm start
+```
+
+<a
+  href="/posts/openai-nodejs-react/21.png"
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  <img
+    src="/posts/openai-nodejs-react/21.png"
+    alt="openai-nodejs-react-21-png"
+    align="left"
+    style="margin-right: 2rem; margin-bottom: 1rem"
+  />
+</a>
+
+2. Below `app.js` `react` code consumes the server endpoints that in-turn call OpenAI APIs
+
+```javascript
+import "./App.css";
+import { useState } from "react";
+
+function App() {
+  const [chatMessage, setChatMessage] = useState("");
+  const [chats, setChats] = useState([]);
+  const [isTyping, setIsTyping] = useState(false);
+
+  const [imageDescription, setImageDescription] = useState("");
+  const [imageAnalysis, setImageAnalysis] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+
+  const [audioDescription, setAudioDescription] = useState("");
+  const [audioGenerated, setAudioGenerated] = useState(false);
+  const [audioTranscription, setAudioTranscription] = useState("");
+  const [audioTranslation, setAudioTranslation] = useState("");
+
+  const [vectorEmbeddings, setVectorEmbeddings] = useState("");
+  const [generatedVectorEmbedding, setGeneratedVectorEmbedding] = useState("");
+
+  const [moderationText, setModerationText] = useState("");
+  const [moderationURL, setModerationURL] = useState("");
+  const [moderationResult, setModerationResult] = useState(null);
+
+  const [assistantChatMessage, setAssistantChatMessage] = useState("");
+  const [assistantChats, setAssistantChats] = useState([]);
+
+  const assistantChat = async (e, inputText) => {
+    e.preventDefault();
+
+    try {
+      const request1 = {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          assistant_id: "<Your assistant id here>",
+          thread_id: "<Your assistant id here>",
+          input_message: inputText,
+        }),
+      };
+
+      const assistantResponse = await fetch(
+        `http://localhost:8080/assistant/messages`,
+        request1
+      );
+      const data1 = await assistantResponse.json();
+
+      if (data1.messages) {
+        setAssistantChats(
+          data1.messages
+            .flat()
+            .reverse()
+            .map((i) => i.text.value)
+        );
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  const performModeration = async (e, inputText, inputURL) => {
+    e.preventDefault();
+
+    try {
+      const request1 = {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          input_text: inputText,
+          input_url: inputURL,
+        }),
+      };
+
+      const moderationAnalysis = await fetch(
+        `http://localhost:8080/moderation/moderations`,
+        request1
+      );
+      const data1 = await moderationAnalysis.json();
+
+      if (data1.output.moderationAnalysis) {
+        setModerationResult(data1.output.moderationAnalysis);
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  const generateEmbedding = async (e, inputText) => {
+    e.preventDefault();
+
+    try {
+      const request1 = {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          input_text: inputText,
+        }),
+      };
+
+      const generatedEmbedding = await fetch(
+        `http://localhost:8080/vector_embeddings/embeddings`,
+        request1
+      );
+      const data1 = await generatedEmbedding.json();
+
+      if (data1.output.embeddedVector) {
+        setGeneratedVectorEmbedding(data1.output.embeddedVector.join(", "));
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  const generateAndAnalyzeAudio = async (e, inputText) => {
+    e.preventDefault();
+
+    try {
+      const request1 = {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt_message: inputText,
+        }),
+      };
+
+      const generatedAudio = await fetch(
+        `http://localhost:8080/text_to_speech/audio_speeches`,
+        request1
+      );
+      const data1 = await generatedAudio.json();
+
+      if (data1.output.speechFileGeneration === "successful") {
+        setAudioGenerated(true);
+
+        const request2 = {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: "",
+        };
+
+        const generatedAudioTranscription = await fetch(
+          `http://localhost:8080/speech_to_text/audio_transcrptions`,
+          request2
+        );
+        const data2 = await generatedAudioTranscription.json();
+        if (data2.output.speechTranscript) {
+          setAudioTranscription(data2.output.speechTranscript);
+        }
+
+        const request3 = {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: "",
+        };
+
+        const generatedAudioTranslation = await fetch(
+          `http://localhost:8080/speech_to_text/audio_translations`,
+          request3
+        );
+        const data3 = await generatedAudioTranslation.json();
+        if (data3.output.speechTranslated) {
+          setAudioTranslation(data3.output.speechTranslated);
+        }
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  const generateAndAnalyzeImage = async (e, inputText) => {
+    e.preventDefault();
+
+    try {
+      const request1 = {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt_message: inputText,
+        }),
+      };
+
+      const generatedImage = await fetch(
+        `http://localhost:8080/image_generation/images`,
+        request1
+      );
+      const data1 = await generatedImage.json();
+
+      const request2 = {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          image_url: data1.output.imageURL,
+        }),
+      };
+
+      const generatedImageAnalysis = await fetch(
+        `http://localhost:8080/vision/images`,
+        request2
+      );
+      const data2 = await generatedImageAnalysis.json();
+
+      setImageAnalysis(data2.output.imageComprehension.message.content);
+      setImageUrl(data1.output.imageURL);
+      setImageDescription("");
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  const completeChat = async (e, chatMessage) => {
+    e.preventDefault();
+
+    if (!chatMessage) return;
+
+    setIsTyping(true);
+    let msgs = chats;
+    msgs.push({ role: "user", content: chatMessage });
+    setChats(msgs);
+
+    setChatMessage("");
+
+    const request = {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        chats,
+      }),
+    };
+    try {
+      const fetchResponse = await fetch(
+        `http://localhost:8080/text_generation/chat_completions`,
+        request
+      );
+      const data = await fetchResponse.json();
+      msgs.push(data.output);
+      setChats(msgs);
+      setIsTyping(false);
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  return (
+    <main>
+      <h1>OpenAI node.js React</h1>
+      <hr />
+
+      <section>
+        <h2>/text_generation/chat_completions</h2>
+        {chats && chats.length
+          ? chats.map((chat, index) => (
+              <p key={index} className={chat.role === "user" ? "user_msg" : ""}>
+                <span>
+                  {chat.role === "user" ? <b>User : </b> : <b>OpenAI : </b>}
+                </span>
+                <span>{chat.content}</span>
+              </p>
+            ))
+          : ""}
+
+        <div className={isTyping ? "" : "hide"}>
+          <p>
+            <i>{isTyping ? "Typing" : ""}</i>
+          </p>
+        </div>
+
+        <form action="" onSubmit={(e) => completeChat(e, chatMessage)}>
+          <input
+            type="text"
+            name="chatMessage"
+            value={chatMessage}
+            placeholder="Chat message"
+            onChange={(e) => setChatMessage(e.target.value)}
+          />
+        </form>
+      </section>
+
+      <hr />
+
+      <section>
+        <h2>/image_generation/images & /vision/images</h2>
+
+        <input
+          type="text"
+          name="imageDescriptionMessage"
+          value={imageDescription}
+          placeholder="Prompt message to generate and analyze that image"
+          onChange={(e) => setImageDescription(e.target.value)}
+        />
+        <button
+          style={{ width: "100%" }}
+          onClick={(e) => generateAndAnalyzeImage(e, imageDescription)}
+        >
+          Generate image and analyze
+        </button>
+        {imageAnalysis && (
+          <p>
+            <span>{imageAnalysis}</span>
+          </p>
+        )}
+        {imageUrl && <img src={imageUrl} alt="Loaded" />}
+      </section>
+
+      <hr />
+
+      <section>
+        <h2>
+          /text_to_speech/audio_speeches, /speech_to_text/audio_transcrptions &
+          /speech_to_text/audio_translations
+        </h2>
+
+        <input
+          type="text"
+          name="audioDescriptionMessage"
+          value={audioDescription}
+          placeholder="Prompt message to generate and transcribe + translate that audio"
+          onChange={(e) => setAudioDescription(e.target.value)}
+        />
+        <button
+          style={{ width: "100%" }}
+          onClick={(e) => generateAndAnalyzeAudio(e, audioDescription)}
+        >
+          Generate audio and transcribe + translate
+        </button>
+        {audioGenerated && (
+          <p>
+            <span>Audio generated successfully</span>
+          </p>
+        )}
+        {audioTranscription && audioTranscription.length > 0 && (
+          <p>
+            <span>Audio transcription - {audioTranscription}</span>
+          </p>
+        )}
+        {audioTranslation && audioTranslation.length > 0 && (
+          <p>
+            <span>Audio translation - {audioTranslation}</span>
+          </p>
+        )}
+      </section>
+
+      <hr />
+
+      <section>
+        <h2>/vector_embeddings/embeddings</h2>
+
+        <input
+          type="text"
+          name="vectorText"
+          value={vectorEmbeddings}
+          placeholder="Text to generate vector embeddings"
+          onChange={(e) => setVectorEmbeddings(e.target.value)}
+        />
+        <button
+          style={{ width: "100%" }}
+          onClick={(e) => generateEmbedding(e, vectorEmbeddings)}
+        >
+          Generate generate vector embeddings
+        </button>
+        {generatedVectorEmbedding && generatedVectorEmbedding.length > 0 && (
+          <p>
+            <span>Generated vector embedding - {generatedVectorEmbedding}</span>
+          </p>
+        )}
+      </section>
+
+      <hr />
+
+      <section>
+        <h2>/moderation/moderations</h2>
+
+        <input
+          type="text"
+          name="moderationText"
+          value={moderationText}
+          placeholder="Text to moderate"
+          onChange={(e) => setModerationText(e.target.value)}
+        />
+        <input
+          type="text"
+          name="moderationURL"
+          value={moderationURL}
+          placeholder="URL to moderate"
+          onChange={(e) => setModerationURL(e.target.value)}
+        />
+        <button
+          style={{ width: "100%" }}
+          onClick={(e) => performModeration(e, moderationText, moderationURL)}
+        >
+          Generate moderation analysis
+        </button>
+        {moderationResult && moderationResult.length > 0 && (
+          <p>
+            <span>
+              Generated moderation - content to be flagged -{" "}
+              {moderationResult[0].flagged.toString()}
+            </span>
+            <br />
+            <br />
+            <span>Generated moderation - content analysis categories -</span>
+            <br />
+            <br />
+            {Object.entries(moderationResult[0].categories).map(
+              ([key, value]) => (
+                <div>{`${key}: ${value}`}</div>
+              )
+            )}
+            <span>Generated moderation - content analysis scores -</span>
+            <br />
+            <br />
+            {Object.entries(moderationResult[0].category_scores).map(
+              ([key, value]) => (
+                <div>{`${key}: ${value}`}</div>
+              )
+            )}
+          </p>
+        )}
+      </section>
+
+      <hr />
+
+      <section>
+        <h2>/reasoning/chat_completions</h2>
+        <p>
+          <span>
+            o1 models are currently in beta with limited features and access to
+            developers in certain usage tiers only
+          </span>
+        </p>
+      </section>
+
+      <hr />
+
+      <section>
+        <h2>/assistant/assistants, /assistant/threads</h2>
+        <p>
+          <span>
+            Use postman to create assistant and thread to avoid duplications
+          </span>
+        </p>
+      </section>
+
+      <hr />
+
+      <section>
+        <h2>/assistant/messages</h2>
+
+        {assistantChats && assistantChats.length
+          ? assistantChats.map((chat, index) => (
+              <p key={index} className={index % 2 ? "user_msg" : ""}>
+                <span>{index % 2 ? <b>User : </b> : <b>OpenAI : </b>}</span>
+                <span>{chat}</span>
+              </p>
+            ))
+          : ""}
+
+        {/* <div className={isTyping ? "" : "hide"}>
+          <p>
+            <i>{isTyping ? "Typing" : ""}</i>
+          </p>
+        </div> */}
+
+        <form
+          action=""
+          onSubmit={(e) => assistantChat(e, assistantChatMessage)}
+        >
+          <input
+            type="text"
+            name="assistantChatMessage"
+            value={assistantChatMessage}
+            placeholder="Chat message with existing thread and assistant"
+            onChange={(e) => setAssistantChatMessage(e.target.value)}
+          />
+        </form>
+      </section>
+    </main>
+  );
+}
+
+export default App;
+```
+
+3. Below `index.js` code makes the above `app.js` usable
+
+```css
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
+    "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans",
+    "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+main {
+  max-width: 1024px;
+  margin: auto;
+}
+
+h1,
+h2 {
+  text-align: center;
+}
+
+p {
+  background-color: lightskyblue;
+  padding: 10px;
+}
+
+.user_msg {
+  text-align: right;
+}
+
+.hide {
+  visibility: hidden;
+  display: none;
+}
+
+input {
+  width: 98%;
+  border: 1px solid #000000;
+  padding: 10px;
+  font-size: 1.1rem;
+}
+
+input:focus {
+  outline: none;
+}
+```
+
+4. Test the endpoints from frontend `react` app at `http://localhost:3000/`
+
+<a
+  href="/posts/openai-nodejs-react/22.png"
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  <img
+    src="/posts/openai-nodejs-react/22.png"
+    alt="openai-nodejs-react-22-png"
+    align="left"
+    style="margin-right: 2rem; margin-bottom: 1rem"
+  />
+</a>
+
+## References
+
+- <a
+    href="https://medium.com/leniolabs/exploring-openais-apis-assistants-vs-chat-completions-91525f73422c"
+    target="_blank"
+    rel="noopener noreferrer"
+  >
+    Reference for OpenAI chap completion and assistant APIs
+  </a>
+
+- <a
+    href="https://www.freecodecamp.org/news/how-to-build-a-chatbot-with-openai-chatgpt-nodejs-and-react/"
+    target="_blank"
+    rel="noopener noreferrer"
+  >
+    Reference for text generation
+  </a>
+
+- <a
+    href="https://medium.com/@kylehe970128/how-to-use-openai-api-in-react-js-enhancing-your-applications-with-ai-in-2024-02e248fdc889"
+    target="_blank"
+    rel="noopener noreferrer"
+  >
+    Reference for image generation and vision
+  </a>
+
+- <a
+    href="https://medium.com/@sathishhariram/openai-embedding-semantic-search-using-vector-data-b785ae7079ff"
+    target="_blank"
+    rel="noopener noreferrer"
+  >
+    Reference for vector embedding generation, store and search 1
+  </a>
+
+- <a
+    href="https://markus.oberlehner.net/blog/your-own-vector-search-in-5-minutes-with-sqlite-openai-embeddings-and-nodejs/"
+    target="_blank"
+    rel="noopener noreferrer"
+  >
+    Reference for vector embedding generation, store and search 2
+  </a>
+
+- <a
+    href="https://dev.to/momentohq/how-to-build-a-question-answering-system-in-nodejs-with-a-vector-index-and-openai-3dkd"
+    target="_blank"
+    rel="noopener noreferrer"
+  >
+    Reference for vector embedding generation, store and search 3 (with
+    chunking)
+  </a>
+
+- <a
+    href="https://serpapi.com/blog/assistant-api-openai-beginner-tutorial/"
+    target="_blank"
+    rel="noopener noreferrer"
+  >
+    Reference for assistant API
+  </a>
+
+`#openai` `#openai4.68.0` `#nodejs` `#openai19.6.0` `#react` `#create-react-app` `#tech`
+
+---
+
+<div style="text-align: left; margin-top: 0.55rem; margin-bottom: 0.40rem;">
+  <a
+    href="https://twitter.com/theimsheth"
+    target="_blank"
+    rel="noopener noreferrer"
+    style="text-decoration:none;"
+  >
+    <img
+      src="/social/twitter.svg"
+      alt="twitter"
+      style="height: 32px; width: 32px; margin: .2rem"
+    />
+  </a>
+  <a
+    href="https://github.com/imsheth"
+    target="_blank"
+    rel="noopener noreferrer"
+    style="text-decoration:none;"
+  >
+    <img
+      src="/social/github.svg"
+      alt="github"
+      style="height: 32px; width: 32px; margin: .2rem"
+    />
+  </a>
+  <a
+    href="https://www.npmjs.com/~imsheth"
+    target="_blank"
+    rel="noopener noreferrer"
+    style="text-decoration:none;"
+  >
+    <img
+      src="/social/npm.svg"
+      alt="npm"
+      style="height: 32px; width: 32px; margin: .2rem"
+    />
+  </a>
+  <a
+    href="https://stackoverflow.com/users/3152654/imsheth?tab=profile"
+    target="_blank"
+    rel="noopener noreferrer"
+    style="text-decoration:none;"
+  >
+    <img
+      src="/social/stackoverflow.svg"
+      alt="stackoverflow"
+      style="height: 32px; width: 32px; margin: .2rem"
+    />
+  </a>
+  <a
+    href="https://in.linkedin.com/in/imsheth"
+    target="_blank"
+    rel="noopener noreferrer"
+    style="text-decoration:none;"
+  >
+    <img
+      src="/social/linkedin.svg"
+      alt="linkedin"
+      style="height: 32px; width: 32px; margin: .2rem"
+    />
+  </a>
+  <a
+    href="https://instagram.com/imsheth/"
+    target="_blank"
+    rel="noopener noreferrer"
+    style="text-decoration:none;"
+  >
+    <img
+      src="/social/instagram.svg"
+      alt="instagram"
+      style="height: 32px; width: 32px; margin: .2rem"
+    />
+  </a>
+  <a
+    href="https://www.facebook.com/imsheth"
+    target="_blank"
+    rel="noopener noreferrer"
+    style="text-decoration:none;"
+  >
+    <img
+      src="/social/facebook.svg"
+      alt="facebook"
+      style="height: 32px; width: 32px; margin: .2rem"
+    />
+  </a>
+  <a
+    href="https://open.spotify.com/user/orekqqr23uij1ehi7upg9akat?si=xXA0ZUqxQW2GgFYzdXgAOA&nd=1"
+    target="_blank"
+    rel="noopener noreferrer"
+    style="text-decoration:none;"
+  >
+    <img
+      src="/social/spotify.svg"
+      alt="spotify"
+      style="height: 32px; width: 32px; margin: .2rem"
+    />
+  </a>
+  <a
+    href="https://www.tvshowtime.com/1589595"
+    target="_blank"
+    rel="noopener noreferrer"
+    style="text-decoration:none;"
+  >
+    <img
+      src="/social/tvtime.svg"
+      alt="tvshowtime"
+      style="height: 32px; width: 32px; margin: .2rem"
+    />
+  </a>
+</div>
+
+---
+
+<br />
+
+import Giscus from "@giscus/react";
+
+<Giscus
+  id="comments"
+  repo="imsheth/imsheth.github.io"
+  repoId="MDEwOlJlcG9zaXRvcnk2Mjg4MDczMw=="
+  category="Announcements"
+  categoryId="DIC_kwDOA7973c4CP60t"
+  mapping="url"
+  term="Welcome to @giscus/react component!"
+  reactionsEnabled="1"
+  emitMetadata="1"
+  inputPosition="top"
+  theme="light"
+  lang="en"
+  loading="lazy"
+/>
