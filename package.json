@@ -31,7 +31,7 @@
     "gatsby-starter-rocket-docs"
   ],
   "scripts": {
-    "build": "gatsby build && sh post_build.sh",
+    "build": "gatsby clean && gatsby build && sh post_build.sh",
     "start": "gatsby clean && gatsby develop",
     "serve": "gatsby serve",
     "clean": "gatsby clean"
